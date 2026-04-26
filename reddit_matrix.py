@@ -4,44 +4,39 @@ import re
 import urllib.error
 import urllib.request
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MATRIX_PATH = os.path.join(BASE_DIR, "web_app", "matrix.json")
-USER_AGENT = "void-matrix/1.0"
+import redis
+
+USER_AGENT = "void-matrix/2.0"
 REDDIT_FEEDS = {
-    "animeedits": "https://www.reddit.com/r/animeedits/hot.json?limit=40",
-    "phonk": "https://www.reddit.com/r/phonk/hot.json?limit=40",
-    "gymmotivation": "https://www.reddit.com/r/GymMotivation/hot.json?limit=40",
+    "animeedits": "https://www.reddit.com/r/animeedits/hot.json?limit=60",
+    "GymMotivation": "https://www.reddit.com/r/GymMotivation/hot.json?limit=60",
 }
 
-DEFAULT_MATRIX = {
-    "God Complex": [
-        "sigma phonk god complex edit",
-        "alpha grindset domination phonk",
-        "anime power awakening edit phonk",
-    ],
-    "Spite": [
-        "revenge workout phonk edit",
-        "prove them wrong gym motivation",
-        "hate fueled training phonk",
-    ],
-    "Discipline": [
-        "discipline over motivation gym edit",
-        "cold routine no excuses phonk",
-        "focus consistency grindset audio",
-    ],
+VIBE_KEYS = {
+    "God Complex": "vibe:god_complex",
+    "Spite": "vibe:spite",
+    "Discipline": "vibe:discipline",
 }
 
 CATEGORY_RULES = {
     "God Complex": [
         "god", "sigma", "alpha", "aura", "king", "monster", "domination", "supreme", "overlord",
+        "invincible", "awakened", "conquer",
     ],
     "Spite": [
         "revenge", "spite", "hate", "prove", "doubt", "enemy", "rage", "anger", "wrong",
+        "betray", "pain", "humiliate",
     ],
     "Discipline": [
         "discipline", "routine", "consistency", "focus", "grind", "no excuses", "stoic", "hard work",
+        "dedication", "habit", "self control", "lock in",
     ],
 }
+
+
+def redis_client_from_env():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    return redis.Redis.from_url(redis_url, decode_responses=True)
 
 
 def fetch_titles(url):
@@ -65,35 +60,31 @@ def classify_title(title):
     return "Discipline"
 
 
-def build_matrix(titles):
-    matrix = {"God Complex": [], "Spite": [], "Discipline": []}
+def seed_query_from_title(title):
+    cleaned = normalize(title)
+    cleaned = re.sub(r"[^a-z0-9\s'-]", "", cleaned).strip()
+    return cleaned[:120]
+
+
+def write_to_redis(client, titles):
+    inserted = {"God Complex": 0, "Spite": 0, "Discipline": 0}
 
     for raw_title in titles:
         vibe = classify_title(raw_title)
-        cleaned = normalize(raw_title)
-        if cleaned:
-            matrix[vibe].append(cleaned)
+        query = seed_query_from_title(raw_title)
+        if not query:
+            continue
 
-    for vibe, defaults in DEFAULT_MATRIX.items():
-        unique = []
-        seen = set()
-        for item in matrix[vibe] + defaults:
-            if item not in seen:
-                seen.add(item)
-                unique.append(item)
-        matrix[vibe] = unique[:50]
+        key = VIBE_KEYS[vibe]
+        inserted[vibe] += client.sadd(key, query)
 
-    return matrix
-
-
-def save_matrix(matrix):
-    os.makedirs(os.path.dirname(MATRIX_PATH), exist_ok=True)
-    with open(MATRIX_PATH, "w", encoding="utf-8") as fp:
-        json.dump(matrix, fp, indent=2)
-    print(f"[+] Saved matrix to {MATRIX_PATH}")
+    return inserted
 
 
 def main():
+    client = redis_client_from_env()
+    client.ping()
+
     collected = []
     errors = []
 
@@ -101,17 +92,18 @@ def main():
         try:
             titles = fetch_titles(url)
             collected.extend(titles)
-            print(f"[*] {name}: collected {len(titles)} titles")
+            print(f"[*] r/{name}: collected {len(titles)} titles")
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            errors.append(f"{name}: {exc}")
+            errors.append(f"r/{name}: {exc}")
 
     if not collected:
-        print("[-] Network fetch failed. Writing default matrix fallback.")
-        save_matrix(DEFAULT_MATRIX)
-        return
+        raise RuntimeError("No Reddit titles collected. Nothing to seed into Redis.")
 
-    matrix = build_matrix(collected)
-    save_matrix(matrix)
+    inserted = write_to_redis(client, collected)
+    for vibe, count in inserted.items():
+        key = VIBE_KEYS[vibe]
+        total = client.scard(key)
+        print(f"[+] {vibe} -> {key} added={count} total={total}")
 
     if errors:
         print("[!] Partial fetch errors:")

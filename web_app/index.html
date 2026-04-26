@@ -115,6 +115,7 @@
     <audio id="audioPlayer" controls autoplay></audio>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const state = {
       activeVibe: null,
@@ -124,6 +125,7 @@
     const buttons = Array.from(document.querySelectorAll('.vibe-btn'));
     const statusNode = document.getElementById('status');
     const player = document.getElementById('audioPlayer');
+    let hlsInstance = null;
 
     function setLoading(isLoading) {
       state.loading = isLoading;
@@ -159,7 +161,26 @@
         state.activeVibe = vibe;
         setActiveButton(vibe);
 
-        player.src = `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        const streamUrl = `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        const isHls = streamUrl.includes('.m3u8');
+
+        if (hlsInstance) {
+          hlsInstance.destroy();
+          hlsInstance = null;
+        }
+
+        if (isHls && window.Hls && Hls.isSupported()) {
+          hlsInstance = new Hls();
+          hlsInstance.loadSource(streamUrl);
+          hlsInstance.attachMedia(player);
+          await new Promise((resolve, reject) => {
+            hlsInstance.on(Hls.Events.MANIFEST_PARSED, resolve);
+            hlsInstance.on(Hls.Events.ERROR, (_, err) => reject(new Error(err?.details || 'hls playback error')));
+          });
+        } else {
+          player.src = streamUrl;
+        }
+
         await player.play();
         statusNode.textContent = `[${vibe}] live → ${data.seed || 'matrix seed'}`;
       } catch (error) {
