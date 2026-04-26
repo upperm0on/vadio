@@ -21,6 +21,7 @@ VIBE_TO_DIR = {
     "Cinematic Aura": "cinematic_aura",
     "Mental Agony": "mental_agony",
     "True Warrior": "true_warrior",
+    "God Complex": "god_complex",
 }
 
 def ensure_directories() -> None:
@@ -37,18 +38,15 @@ async def run_command(*args: str) -> tuple[int, str, str]:
     return process.returncode, stdout.decode("utf-8", errors="ignore"), stderr.decode("utf-8", errors="ignore")
 
 async def discover_metadata(query: str) -> Optional[dict]:
-    """Surgically finds 2026 TikTok/Instagram edits."""
+    """Surgically finds high-impact edits (Preferred 2026)."""
     import random
-    # Enforcing 2026 and platform-specific sources
-    # We use 'dateafter:20260101' to ensure only fresh content
     code, out, err = await run_command(
         str(YTDLP_BIN),
         "--no-warnings",
         "--skip-download",
-        "--dateafter", "20260101",
         "--print",
         "id,title,uploader,duration,webpage_url",
-        f"ytsearch20:2026 {query}",
+        f"ytsearch20:{query}",
     )
     if code != 0:
         return None
@@ -64,8 +62,8 @@ async def discover_metadata(query: str) -> Optional[dict]:
                 if len(parts) == 1: total_seconds = parts[0]
                 elif len(parts) == 2: total_seconds = parts[0] * 60 + parts[1]
                 
-                # TikTok/IG edits are usually short and impactful
-                if 5 <= total_seconds <= 90:
+                # Edits are usually short and impactful
+                if 5 <= total_seconds <= 120:
                     results.append({
                         "id": all_lines[i],
                         "title": all_lines[i+1],
@@ -131,42 +129,42 @@ async def run_harvester() -> None:
     ensure_directories()
     print("[*] Void Deep Harvester 3.0 (Matrix-Linked) online.")
 
-    # TikTok/Instagram 2026 Surgical Dorks (Menacing & Motivational)
+    # TikTok Elite Creators & Trends (Paradox, Aezfarul, Reap, FF3F)
     VIBE_BASE = {
         "Cinematic Aura": [
-            "site:tiktok.com 2026 anime aura edit audio cinematic", 
-            "site:instagram.com 2026 anime god complex audio",
-            "site:tiktok.com 2026 aizen bankai english dub edit",
-            "site:instagram.com 2026 gojo satoru menacing audio",
-            "site:tiktok.com 2026 perfect girl choir slowed",
-            "site:instagram.com 2026 legendary anime dialogue"
+            "2026 tiktok anime edit @ff3f.films tanjiro love me", 
+            "2026 tiktok anime edit @reap.iko shinobu love me",
+            "2026 tiktok batman dark knight @paradox.creations aura",
+            "2026 gojo satoru aura audio tough tiktok",
+            "2026 cinematic anime edit audio elite creator",
+            "2026 anime aura edit @ff3f.films viral"
         ],
         "Mental Agony": [
-            "site:tiktok.com 2026 thorfinn scream edit audio", 
-            "site:instagram.com 2026 eren yeager rumbling dub edit",
-            "site:tiktok.com 2026 kaneki ken breakdown dialogue",
-            "site:instagram.com 2026 tragedy anime edit audio",
-            "site:tiktok.com 2026 berserk guts rage dub audio",
-            "site:instagram.com 2026 agonizing anime edit"
+            "2026 tiktok anime agony @reap.iko shinobu edit", 
+            "2026 tragedy anime edit audio emotional tiktok",
+            "2026 thorfinn scream edit audio agonizing tiktok",
+            "2026 kaneki ken breakdown dialogue tiktok",
+            "2026 agonizing anime edit audio @ff3f.films",
+            "2026 mental agony anime edit peak tiktok"
         ],
         "True Warrior": [
-            "site:tiktok.com 2026 thorfinn no enemies dub edit", 
-            "site:instagram.com 2026 vinland saga stoic dialogue",
-            "site:tiktok.com 2026 musashi miyamoto discipline audio",
-            "site:instagram.com 2026 vagabond manga aesthetic",
-            "site:tiktok.com 2026 stoic warrior motivation",
-            "site:instagram.com 2026 peaceful warrior dialogue"
+            "2026 thorfinn no enemies dub edit tiktok", 
+            "2026 vinland saga stoic dialogue @paradox.creations",
+            "2026 musashi miyamoto discipline audio tiktok",
+            "2026 vagabond manga aesthetic edit audio tiktok",
+            "2026 stoic warrior motivation tiktok @aezfarul.x",
+            "2026 peaceful warrior dialogue anime tiktok"
         ],
         "God Complex": [
-            "site:tiktok.com 2026 winter arc motivation aggressive",
-            "site:instagram.com 2026 david goggins stay driven audio",
-            "site:tiktok.com 2026 sukuna stand proud english dub edit",
-            "site:instagram.com 2026 madara uchiha arrogant dialogue",
-            "site:tiktok.com 2026 andrew tate aggressive motivation",
-            "site:instagram.com 2026 tough anime edit dub testosterone",
-            "site:tiktok.com 2026 gilgamesh arrogant king edit audio",
-            "site:instagram.com 2026 comeback arc motivation anime",
-            "site:tiktok.com 2026 homelander egoistic edit audio"
+            "2026 toji fushiguro this mf is different @aezfarul.x",
+            "2026 batman bruce wayne menacing @paradox.creations",
+            "2026 sukuna stand proud english dub tiktok edit",
+            "2026 madara uchiha arrogant dialogue tiktok",
+            "2026 tough anime edit dub testosterone tiktok",
+            "2026 toji fushiguro aggressive audio tiktok",
+            "2026 gilgamesh arrogant king edit audio tiktok",
+            "2026 comeback arc motivation anime edit tiktok",
+            "2026 homelander egoistic edit audio tiktok"
         ]
     }
 
