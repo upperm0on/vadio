@@ -1,105 +1,78 @@
 import http.server
 import json
 import os
+import random
 import socketserver
-import subprocess
-
-import redis
+from pathlib import Path
 
 PORT = 8090
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB_DIR = os.path.join(BASE_DIR, "web_app")
-YTDLP_PATH = os.path.join(BASE_DIR, "tools", "yt-dlp")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+WEB_DIR = Path(__file__).resolve().parent
+RADIO_DIR = WEB_DIR / "radio"
 
-VIBE_KEYS = {
-    "God Complex": "vibe:god_complex",
-    "Spite": "vibe:spite",
-    "Discipline": "vibe:discipline",
+VIBE_PATHS = {
+    "god complex": "god_complex",
+    "god_complex": "god_complex",
+    "god": "god_complex",
+    "spite": "spite",
+    "pure spite": "spite",
+    "discipline": "discipline",
+    "cold discipline": "discipline",
 }
-
-
-def normalize_vibe(vibe):
-    if not isinstance(vibe, str):
-        return "Discipline"
-
-    cleaned = vibe.strip().lower()
-    if cleaned in {"god complex", "god_complex", "god"}:
-        return "God Complex"
-    if cleaned in {"spite", "pure spite"}:
-        return "Spite"
-    return "Discipline"
-
-
-def redis_client():
-    return redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=WEB_DIR, **kwargs)
+        super().__init__(*args, directory=str(WEB_DIR), **kwargs)
 
-    def _send_json(self, status_code, payload):
+    def _send_json(self, status_code: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
         self.send_response(status_code)
-        self.send_header("Content-type", "application/json")
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(json.dumps(payload).encode("utf-8"))
+        self.wfile.write(body)
 
-    def _random_seed_query(self, vibe):
-        normalized = normalize_vibe(vibe)
-        key = VIBE_KEYS[normalized]
-        client = redis_client()
-        query = client.srandmember(key)
-        if not query:
-            raise RuntimeError(f"No cached queries in Redis set: {key}. Run reddit_matrix.py first.")
-        return normalized, query
+    def _resolve_vibe_directory(self, raw_vibe: str | None) -> Path:
+        key = (raw_vibe or "discipline").strip().lower()
+        folder = VIBE_PATHS.get(key, "discipline")
+        return RADIO_DIR / folder
 
-    def do_POST(self):
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path != "/generate":
+            self._send_json(404, {"error": "Not found."})
+            return
+
         try:
-            if self.path != "/generate":
-                self.send_response(404)
-                self.end_headers()
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = self.rfile.read(length) if length > 0 else b"{}"
+            data = json.loads(payload.decode("utf-8")) if payload else {}
+            vibe_dir = self._resolve_vibe_directory(data.get("vibe"))
+
+            if not vibe_dir.exists():
+                vibe_dir.mkdir(parents=True, exist_ok=True)
+
+            tracks = [f for f in os.listdir(vibe_dir) if f.lower().endswith(".mp3")]
+            if not tracks:
+                self._send_json(
+                    503,
+                    {
+                        "error": "No local tracks available yet. Harvester is still collecting audio.",
+                        "status": "harvesting",
+                    },
+                )
                 return
 
-            content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0:
-                self._send_json(400, {"error": "Missing POST body."})
-                return
-
-            payload = self.rfile.read(content_length)
-            data = json.loads(payload.decode("utf-8"))
-            requested_vibe = data.get("vibe", "Discipline")
-
-            vibe, seed_query = self._random_seed_query(requested_vibe)
-            print(f"[Master] Vibe={vibe} | Seed={seed_query}")
-
-            cmd = [
-                YTDLP_PATH,
-                "--get-url",
-                f"ytsearch1:{seed_query}",
-                "--no-warnings",
-            ]
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            stream_url = (result.stdout or "").strip().splitlines()
-            if not stream_url:
-                raise RuntimeError("No direct stream URL returned by yt-dlp.")
-
-            self._send_json(200, {"url": stream_url[0], "vibe": vibe, "seed": seed_query})
-
-        except redis.RedisError as exc:
-            print(f"[Redis] Failed to read vibe set: {exc}")
-            self._send_json(500, {"error": "Redis is unavailable."})
-        except subprocess.CalledProcessError as exc:
-            print(f"[Stream] Failed to resolve direct source: {exc}")
-            self._send_json(500, {"error": "Failed to resolve direct source."})
-        except json.JSONDecodeError as exc:
-            print(f"[Request] Invalid JSON payload: {exc}")
+            filename = random.choice(tracks)
+            rel_dir = vibe_dir.relative_to(WEB_DIR).as_posix()
+            seed = Path(filename).stem
+            self._send_json(200, {"url": f"/{rel_dir}/{filename}", "seed": seed})
+        except json.JSONDecodeError:
             self._send_json(400, {"error": "Invalid JSON payload."})
-        except Exception as exc:
-            print(f"[Server] Unexpected error in do_POST: {exc}")
-            self._send_json(500, {"error": str(exc) if str(exc) else "Internal server error."})
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Server error: {exc}"})
 
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print(f"[System] Void Ripper online on port {PORT}")
-    httpd.serve_forever()
+if __name__ == "__main__":
+    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+        print(f"[System] Void local radio server online on port {PORT}")
+        httpd.serve_forever()
