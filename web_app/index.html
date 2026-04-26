@@ -115,7 +115,6 @@
     <audio id="audioPlayer" controls autoplay></audio>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const state = {
       activeVibe: null,
@@ -125,7 +124,7 @@
     const buttons = Array.from(document.querySelectorAll('.vibe-btn'));
     const statusNode = document.getElementById('status');
     const player = document.getElementById('audioPlayer');
-    let hlsInstance = null;
+    let prebuffer = null;
 
     function setLoading(isLoading) {
       state.loading = isLoading;
@@ -140,49 +139,64 @@
       });
     }
 
-    async function fetchAndPlay(vibe) {
+    async function requestTrack(vibe) {
+      const response = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vibe }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.error || !data.url) {
+        throw new Error(data.error || 'stream generation failed');
+      }
+
+      return data;
+    }
+
+    async function prebufferNext(vibe) {
+      try {
+        const data = await requestTrack(vibe);
+        prebuffer = {
+          vibe,
+          seed: data.seed || 'matrix seed',
+          url: `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`,
+        };
+      } catch (error) {
+        prebuffer = null;
+        console.error('prebuffer failed', error);
+      }
+    }
+
+    async function fetchAndPlay(vibe, usePrebuffer = true) {
       if (!vibe || state.loading) return;
 
       setLoading(true);
-      statusNode.textContent = `[${vibe}] acquiring next stream...`;
+      statusNode.textContent = `[${vibe}] acquiring next track...`;
 
       try {
-        const response = await fetch('/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vibe }),
-        });
-
-        const data = await response.json();
-        if (!response.ok || data.error || !data.url) {
-          throw new Error(data.error || 'stream generation failed');
+        let track;
+        if (usePrebuffer && prebuffer && prebuffer.vibe === vibe) {
+          track = prebuffer;
+          prebuffer = null;
+        } else {
+          const data = await requestTrack(vibe);
+          track = {
+            vibe,
+            seed: data.seed || 'matrix seed',
+            url: `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`,
+          };
         }
 
         state.activeVibe = vibe;
         setActiveButton(vibe);
 
-        const streamUrl = `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`;
-        const isHls = streamUrl.includes('.m3u8');
-
-        if (hlsInstance) {
-          hlsInstance.destroy();
-          hlsInstance = null;
-        }
-
-        if (isHls && window.Hls && Hls.isSupported()) {
-          hlsInstance = new Hls();
-          hlsInstance.loadSource(streamUrl);
-          hlsInstance.attachMedia(player);
-          await new Promise((resolve, reject) => {
-            hlsInstance.on(Hls.Events.MANIFEST_PARSED, resolve);
-            hlsInstance.on(Hls.Events.ERROR, (_, err) => reject(new Error(err?.details || 'hls playback error')));
-          });
-        } else {
-          player.src = streamUrl;
-        }
-
+        player.src = track.url;
+        player.load();
         await player.play();
-        statusNode.textContent = `[${vibe}] live → ${data.seed || 'matrix seed'}`;
+        statusNode.textContent = `[${vibe}] live → ${track.seed}`;
+
+        void prebufferNext(vibe);
       } catch (error) {
         statusNode.textContent = `stream error: ${error.message}`;
       } finally {
