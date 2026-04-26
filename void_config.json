@@ -1,0 +1,10 @@
+{
+  "AUTONOMY_MODE": true,
+  "TARGET_DORKS": [
+    "site:tiktok.com anime tough edit quote",
+    "site:youtube.com erwin smith speech dub",
+    "site:youtube.com thorfinn i have no enemies dub",
+    "site:tiktok.com aot survey corps charge quote"
+  ],
+  "OUTPUT_DIR": "/data/workspace/web_app/generated_edits"
+}

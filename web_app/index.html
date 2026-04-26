@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Void Engine | TikTok Ripper</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #0D0D0D; color: #fff; display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+        .container { background: #1a1a1a; padding: 2rem; border-radius: 8px; border: 1px solid #333; max-width: 500px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h1 { color: #FF6B00; margin-top: 0; font-weight: 800; letter-spacing: -1px; text-transform: uppercase; }
+        p { color: #888; font-size: 0.9rem; margin-bottom: 2rem; }
+        input[type="text"] { width: 95%; padding: 1rem; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; margin-bottom: 1rem; font-size: 1rem; }
+        button { background: #FF6B00; color: #000; border: none; padding: 1rem 1.5rem; font-size: 1rem; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; text-transform: uppercase; transition: background 0.2s; }
+        button:hover { background: #e66000; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status { margin-top: 1rem; color: #FF6B00; font-size: 0.9rem; font-weight: bold; text-align: center; }
+        audio { width: 100%; margin-top: 1rem; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Void Engine</h1>
+    <p>Autonomous TikTok Edit Ripper.</p>
+    
+    <input type="text" id="quoteInput" placeholder="Enter quote (e.g. 'Thorfinn no enemies edit')">
+    <button id="generateBtn">Find & Rip Edit</button>
+    
+    <div id="status"></div>
+    <audio id="audioPlayer" controls></audio>
+</div>
+
+<script>
+    document.getElementById('generateBtn').onclick = async () => {
+        const quote = document.getElementById('quoteInput').value;
+        if (!quote) return alert("Enter a search term.");
+        
+        const btn = document.getElementById('generateBtn');
+        const status = document.getElementById('status');
+        const player = document.getElementById('audioPlayer');
+        
+        btn.disabled = true;
+        player.style.display = 'none';
+        status.innerText = "[*] Deploying swarm... Scouting TikTok and ripping audio.";
+        
+        try {
+            const res = await fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quote })
+            });
+            const data = await res.json();
+            
+            if (data.error) {
+                status.innerText = "[-] " + data.error;
+            } else {
+                player.src = data.url + '?t=' + new Date().getTime(); // cache bust
+                player.style.display = 'block';
+                player.play();
+                status.innerText = "[+] Edit successfully ripped from TikTok.";
+            }
+        } catch (e) {
+            status.innerText = "[-] Error connecting to Void backend.";
+        } finally {
+            btn.disabled = false;
+        }
+    };
+</script>
+</body>
+</html>
