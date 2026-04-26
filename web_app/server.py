@@ -1,60 +1,66 @@
 import http.server
-import socketserver
 import json
-import subprocess
 import os
+import socketserver
+import subprocess
 
 PORT = 8090
-WEB_DIR = "/data/workspace/web_app"
-FFMPEG_PATH = "/data/workspace/tools/ffmpeg"
-YTDLP_PATH = "/data/workspace/tools/yt-dlp"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WEB_DIR = os.path.join(BASE_DIR, "web_app")
+YTDLP_PATH = os.path.join(BASE_DIR, "tools", "yt-dlp")
+
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WEB_DIR, **kwargs)
 
-    def do_POST(self):
-        if self.path == '/generate':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
-            
-            quote_query = data.get('quote', 'Thorfinn no enemies edit')
-            print(f"[Master] New task received: {quote_query}")
-            
-            out_file = f"{WEB_DIR}/final_edit.mp3"
-            if os.path.exists(out_file):
-                os.remove(out_file)
+    def _send_json(self, status_code, payload):
+        self.send_response(status_code)
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(payload).encode("utf-8"))
 
-            # Route through SoundCloud to completely bypass TikTok/YouTube datacenter IP blocks
-            print(f"[Extractor] Ripping from SoundCloud database: {quote_query}")
+    def do_POST(self):
+        try:
+            if self.path != "/generate":
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0:
+                self._send_json(400, {"error": "Missing POST body."})
+                return
+
+            payload = self.rfile.read(content_length)
+            data = json.loads(payload.decode("utf-8"))
+            quote_query = data.get("quote", "thorfinn no enemies edit")
+            print(f"[Master] New task received: {quote_query}")
+
             cmd = [
-                YTDLP_PATH, 
-                f"scsearch1:{quote_query} phonk audio", 
-                "-x", 
-                "--audio-format", "mp3", 
-                "--audio-quality", "0",
-                "--ffmpeg-location", FFMPEG_PATH,
-                "-o", f"{WEB_DIR}/final_edit.%(ext)s", 
-                "--force-overwrites"
+                YTDLP_PATH,
+                "--get-url",
+                f"ytsearch1:{quote_query} tiktok edit",
+                "--no-warnings",
             ]
-            
-            try:
-                subprocess.run(cmd, check=True)
-                print("[Audio] Audio successfully ripped.")
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({"url": "/final_edit.mp3"}).encode())
-            except Exception as e:
-                print(f"[Audio] Failed to rip: {e}")
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Failed to extract audio from source."}).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            stream_url = (result.stdout or "").strip().splitlines()
+            if not stream_url:
+                raise RuntimeError("No direct stream URL returned by yt-dlp.")
+
+            print("[Stream] Direct source ready.")
+            self._send_json(200, {"url": stream_url[0]})
+
+        except subprocess.CalledProcessError as e:
+            print(f"[Stream] Failed to resolve direct source: {e}")
+            self._send_json(500, {"error": "Failed to resolve direct source."})
+        except json.JSONDecodeError as e:
+            print(f"[Request] Invalid JSON payload: {e}")
+            self._send_json(400, {"error": "Invalid JSON payload."})
+        except Exception as e:
+            print(f"[Server] Unexpected error in do_POST: {e}")
+            self._send_json(500, {"error": "Internal server error."})
+
 
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
     print(f"[System] Void Ripper online on port {PORT}")
