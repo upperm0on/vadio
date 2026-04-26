@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, Shield, Volume2, Radio } from 'lucide-react';
+import { Activity, Zap, Shield, Volume2, Radio, Crown } from 'lucide-react';
 import './App.css';
 
 const VIBES = {
   "Cinematic Aura": { color: "#FF3333", rgb: "255,51,51", icon: Zap, label: "ASCENSION" },
   "Mental Agony": { color: "#AA33FF", rgb: "170,51,255", icon: Activity, label: "COLLAPSE" },
-  "True Warrior": { color: "#33AAFF", rgb: "51,170,255", icon: Shield, label: "STOICISM" }
+  "True Warrior": { color: "#33AAFF", rgb: "51,170,255", icon: Shield, label: "STOICISM" },
+  "God Complex": { color: "#FFD700", rgb: "255,215,0", icon: Crown, label: "EGOISM" }
 };
 
 const App = () => {
@@ -81,10 +82,11 @@ const App = () => {
   const handleCrossfade = async () => {
     if (isTransitioning.current || !activeVibe) return;
     
-    const nextData = vibeCache.current[activeVibe];
+    let nextData = vibeCache.current[activeVibe];
     if (!nextData) {
-      refillCache(activeVibe);
-      return;
+      console.log("[Void] Cache empty for crossfade, fetching on demand...");
+      nextData = await fetchTrack(activeVibe);
+      if (!nextData) return;
     }
 
     isTransitioning.current = true;
@@ -166,9 +168,21 @@ const App = () => {
         }
         requestAnimationFrame(check);
     };
+
+    const handleEnded = () => {
+        console.log("[Void] Track ended, forcing transition...");
+        if (!isTransitioning.current) handleCrossfade();
+    };
+
+    pA.addEventListener('ended', handleEnded);
+    pB.addEventListener('ended', handleEnded);
     
     const animId = requestAnimationFrame(check);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+        cancelAnimationFrame(animId);
+        pA.removeEventListener('ended', handleEnded);
+        pB.removeEventListener('ended', handleEnded);
+    };
   }, [activeVibe]);
 
   return (

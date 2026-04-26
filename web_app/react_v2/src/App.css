@@ -101,19 +101,19 @@ body {
 
 .vibe-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
 }
 
 .vibe-btn {
   background: var(--glass);
   border: 1px solid var(--border);
   color: #fff;
-  padding: 30px;
-  border-radius: 20px;
+  padding: 24px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   cursor: pointer;
   transition: 0.4s;
   backdrop-filter: blur(20px);

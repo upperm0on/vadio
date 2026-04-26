@@ -37,16 +37,18 @@ async def run_command(*args: str) -> tuple[int, str, str]:
     return process.returncode, stdout.decode("utf-8", errors="ignore"), stderr.decode("utf-8", errors="ignore")
 
 async def discover_metadata(query: str) -> Optional[dict]:
-    """Uses yt-dlp to find top 20 matches and filters for surgical 'Edit Audios' (< 90s)."""
+    """Surgically finds 2026 TikTok/Instagram edits."""
     import random
-    # Searching for edit audios, scenepacks, and SFX versions
+    # Enforcing 2026 and platform-specific sources
+    # We use 'dateafter:20260101' to ensure only fresh content
     code, out, err = await run_command(
         str(YTDLP_BIN),
         "--no-warnings",
         "--skip-download",
+        "--dateafter", "20260101",
         "--print",
         "id,title,uploader,duration,webpage_url",
-        f"ytsearch20:{query}",
+        f"ytsearch20:2026 {query}",
     )
     if code != 0:
         return None
@@ -57,15 +59,13 @@ async def discover_metadata(query: str) -> Optional[dict]:
         if i + 4 < len(all_lines):
             try:
                 duration_str = all_lines[i+3]
-                # Convert duration to seconds (H:M:S or M:S)
                 parts = list(map(int, duration_str.split(':')))
                 total_seconds = 0
                 if len(parts) == 1: total_seconds = parts[0]
                 elif len(parts) == 2: total_seconds = parts[0] * 60 + parts[1]
-                elif len(parts) == 3: total_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
                 
-                # STRICT FILTER: Edit audios are usually between 10s and 90s
-                if 10 <= total_seconds <= 95:
+                # TikTok/IG edits are usually short and impactful
+                if 5 <= total_seconds <= 90:
                     results.append({
                         "id": all_lines[i],
                         "title": all_lines[i+1],
@@ -77,8 +77,6 @@ async def discover_metadata(query: str) -> Optional[dict]:
     
     if not results:
         return None
-        
-    # Pick a random surgical edit
     return random.choice(results)
 
 def already_downloaded(vibe_dir: Path, video_id: str) -> bool:
@@ -133,32 +131,43 @@ async def run_harvester() -> None:
     ensure_directories()
     print("[*] Void Deep Harvester 3.0 (Matrix-Linked) online.")
 
-    # Iconic "Impact & Agony" Queries (Choirs, Screams, Dialogue)
+    # TikTok/Instagram 2026 Surgical Dorks (Menacing & Motivational)
     VIBE_BASE = {
         "Cinematic Aura": [
-            "invincible omniman choir edit audio", 
-            "perfect girl slowed reverb orchestral choir",
-            "sukuna domain expansion audio with dialogue",
-            "gojo hollow purple cinematic choir audio",
-            "aizen bankai ethereal choir edit",
-            "legendary anime aura audio with choir"
+            "site:tiktok.com 2026 anime aura edit audio cinematic", 
+            "site:instagram.com 2026 anime god complex audio",
+            "site:tiktok.com 2026 aizen bankai english dub edit",
+            "site:instagram.com 2026 gojo satoru menacing audio",
+            "site:tiktok.com 2026 perfect girl choir slowed",
+            "site:instagram.com 2026 legendary anime dialogue"
         ],
         "Mental Agony": [
-            "thorfinn scream edit audio i'll kill you", 
-            "eren yeager rumbling scream edit audio",
-            "kaneki ken breakdown dialogue edit audio",
-            "mental agony anime edit with raw screams",
-            "berserk guts rage audio with dialogue",
-            "agonizing anime edit audio for tiktok"
+            "site:tiktok.com 2026 thorfinn scream edit audio", 
+            "site:instagram.com 2026 eren yeager rumbling dub edit",
+            "site:tiktok.com 2026 kaneki ken breakdown dialogue",
+            "site:instagram.com 2026 tragedy anime edit audio",
+            "site:tiktok.com 2026 berserk guts rage dub audio",
+            "site:instagram.com 2026 agonizing anime edit"
         ],
         "True Warrior": [
-            "thorfinn i have no enemies dialogue audio", 
-            "vinland saga thors philosophy dialogue edit",
-            "musashi miyamoto stoic dialogue audio",
-            "vagabond manga aesthetic with nature SFX",
-            "stoic warrior anime dialogue audio",
-            "peaceful anime warrior edit with dialogue"
+            "site:tiktok.com 2026 thorfinn no enemies dub edit", 
+            "site:instagram.com 2026 vinland saga stoic dialogue",
+            "site:tiktok.com 2026 musashi miyamoto discipline audio",
+            "site:instagram.com 2026 vagabond manga aesthetic",
+            "site:tiktok.com 2026 stoic warrior motivation",
+            "site:instagram.com 2026 peaceful warrior dialogue"
         ],
+        "God Complex": [
+            "site:tiktok.com 2026 winter arc motivation aggressive",
+            "site:instagram.com 2026 david goggins stay driven audio",
+            "site:tiktok.com 2026 sukuna stand proud english dub edit",
+            "site:instagram.com 2026 madara uchiha arrogant dialogue",
+            "site:tiktok.com 2026 andrew tate aggressive motivation",
+            "site:instagram.com 2026 tough anime edit dub testosterone",
+            "site:tiktok.com 2026 gilgamesh arrogant king edit audio",
+            "site:instagram.com 2026 comeback arc motivation anime",
+            "site:tiktok.com 2026 homelander egoistic edit audio"
+        ]
     }
 
     while True:

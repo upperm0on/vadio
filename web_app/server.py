@@ -15,6 +15,7 @@ VIBE_PATHS = {
     "cinematic aura": "cinematic_aura",
     "mental agony": "mental_agony",
     "true warrior": "true_warrior",
+    "god complex": "god_complex",
 }
 
 # State for entropy check: prevent recent repeats. 
