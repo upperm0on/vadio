@@ -1,2 +1,14 @@
--e .env
-.openclaw/
+__pycache__/
+*.pyc
+.env
+.venv
+env/
+venv/
+node_modules/
+dist/
+web_app/radio/
+web_app/react_v2/node_modules/
+web_app/react_v2/dist/
+.DS_Store
+.vscode/
+.idea/

@@ -3,217 +3,463 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Void Engine | Infinite Stream</title>
+  <title>Void Engine | 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;600;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0D0D0D;
-      --accent: #FF6B00;
-      --fg: #f7f7f7;
-      --muted: #7e7e7e;
-      --panel: #141414;
+      --bg: #030303;
+      --fg: #ffffff;
+      --vibe-color: #555555; /* Changes dynamically */
+      --glass-bg: rgba(20, 20, 20, 0.4);
+      --glass-border: rgba(255, 255, 255, 0.05);
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      margin: 0;
-      min-height: 100vh;
       background: var(--bg);
       color: var(--fg);
-      font-family: Inter, Arial, sans-serif;
-      display: grid;
-      place-items: center;
-      padding: 24px;
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: background 1s ease;
     }
 
-    .shell {
-      width: min(960px, 100%);
-      border: 2px solid var(--accent);
-      background: var(--panel);
-      padding: 24px;
+    /* Visualizer Canvas */
+    #visualizer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.6;
+      filter: blur(8px);
     }
 
-    h1 {
-      margin: 0 0 6px;
+    /* Main Container */
+    .interface {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      justify-content: space-between;
+      background: radial-gradient(circle at 50% 0%, rgba(var(--vibe-rgb), 0.15) 0%, transparent 60%);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--accent);
-      font-size: clamp(1.8rem, 2.8vw, 2.6rem);
+      letter-spacing: 0.2em;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
     }
 
-    .sub {
-      margin: 0 0 24px;
-      color: var(--muted);
+    .brand span {
+      color: var(--vibe-color);
+      transition: color 0.5s ease;
+    }
+
+    /* Now Playing Marquee Area */
+    .now-playing {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      font-size: 0.75rem;
       text-transform: uppercase;
-      letter-spacing: 0.15em;
-      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
     }
 
-    .grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--vibe-color);
+      box-shadow: 0 0 10px var(--vibe-color);
+    }
+
+    .track-title {
+      font-size: clamp(3rem, 6vw, 6rem);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+      background: linear-gradient(to right, #fff, rgba(255,255,255,0.3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       margin-bottom: 16px;
+      max-width: 80%;
+      /* Marquee effect if too long */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-uploader {
+      font-size: 1.2rem;
+      font-weight: 300;
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 0.05em;
+    }
+
+    /* Vibe Selector */
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-top: auto;
     }
 
     .vibe-btn {
-      border: 2px solid var(--accent);
-      background: transparent;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
       color: var(--fg);
-      padding: 28px 16px;
-      min-height: 140px;
+      padding: 24px 32px;
+      border-radius: 16px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
       text-transform: uppercase;
-      font-weight: 900;
-      font-size: clamp(1rem, 2vw, 1.4rem);
-      letter-spacing: 0.06em;
+      letter-spacing: 0.1em;
       cursor: pointer;
+      backdrop-filter: blur(20px);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      flex: 1;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .vibe-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
+      transform: translateX(-100%);
+      transition: 0.5s;
+    }
+
+    .vibe-btn:hover::before {
+      transform: translateX(100%);
+    }
+
+    .vibe-btn:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
     }
 
     .vibe-btn.active {
-      background: var(--accent);
+      background: var(--vibe-color);
       color: #000;
+      border-color: transparent;
+      box-shadow: 0 10px 30px rgba(var(--vibe-rgb), 0.3);
     }
 
     .vibe-btn:disabled {
-      opacity: 0.55;
+      opacity: 0.5;
       cursor: wait;
+      transform: none;
     }
 
-    #status {
-      min-height: 1.2em;
-      margin-bottom: 16px;
-      color: var(--accent);
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
+    /* Hidden Audio Player */
+    audio { display: none; }
 
-    audio {
-      width: 100%;
-      border-top: 1px solid #2d2d2d;
-      padding-top: 12px;
-    }
-
-    @media (max-width: 840px) {
-      .grid { grid-template-columns: 1fr; }
-      .vibe-btn { min-height: 96px; }
+    @media (max-width: 768px) {
+      .interface { padding: 24px; }
+      .controls { flex-direction: column; }
+      .track-title { font-size: 2.5rem; max-width: 100%; }
+      .vibe-btn { padding: 20px; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <h1>Void Engine</h1>
-    <p class="sub">Infinite AI-free state radio</p>
+  <canvas id="visualizer"></canvas>
 
-    <section class="grid" id="vibeGrid">
-      <button class="vibe-btn" data-vibe="God Complex">God Complex</button>
-      <button class="vibe-btn" data-vibe="Spite">Pure Spite</button>
-      <button class="vibe-btn" data-vibe="Discipline">Cold Discipline</button>
+  <main class="interface">
+    <header>
+      <div class="brand">Void<span>Engine</span></div>
+      <div class="version">Build 2026.4</div>
+    </header>
+
+    <section class="now-playing">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span id="status-text">Awaiting State Injection</span>
+      </div>
+      <h1 class="track-title" id="track-title">SILENCE</h1>
+      <div class="track-uploader" id="track-uploader">Select a state below</div>
     </section>
 
-    <div id="status">Select a state to begin.</div>
-    <audio id="audioPlayer" controls autoplay></audio>
+    <section class="controls">
+      <button class="vibe-btn" data-vibe="Cinematic Aura" data-color="#FF3333" data-rgb="255,51,51">Cinematic Aura</button>
+      <button class="vibe-btn" data-vibe="Mental Agony" data-color="#AA33FF" data-rgb="170,51,255">Mental Agony</button>
+      <button class="vibe-btn" data-vibe="True Warrior" data-color="#33AAFF" data-rgb="51,170,255">True Warrior</button>
+    </section>
   </main>
+
+  <audio id="audioA" crossorigin="anonymous"></audio>
+  <audio id="audioB" crossorigin="anonymous"></audio>
 
   <script>
     const state = {
       activeVibe: null,
       loading: false,
+      currentPlayer: 'A',
+      isTransitioning: false,
+      // Cache for the NEXT track of each vibe
+      vibeCache: {
+          "Cinematic Aura": null,
+          "Mental Agony": null,
+          "True Warrior": null
+      }
     };
 
     const buttons = Array.from(document.querySelectorAll('.vibe-btn'));
-    const statusNode = document.getElementById('status');
-    const player = document.getElementById('audioPlayer');
-    let prebuffer = null;
+    const statusText = document.getElementById('status-text');
+    const trackTitle = document.getElementById('track-title');
+    const trackUploader = document.getElementById('track-uploader');
+    
+    const playerA = document.getElementById('audioA');
+    const playerB = document.getElementById('audioB');
+    const root = document.documentElement;
 
-    function setLoading(isLoading) {
-      state.loading = isLoading;
-      buttons.forEach(btn => {
-        btn.disabled = isLoading;
-      });
+    // --- Web Audio API Visualizer & Mixer ---
+    let audioContext, analyser, dataArray, sourceA, sourceB, gainA, gainB;
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function initAudioContext() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        gainA = audioContext.createGain();
+        gainB = audioContext.createGain();
+        sourceA = audioContext.createMediaElementSource(playerA);
+        sourceB = audioContext.createMediaElementSource(playerB);
+        sourceA.connect(gainA);
+        sourceB.connect(gainB);
+        gainA.connect(analyser);
+        gainB.connect(analyser);
+        analyser.connect(audioContext.destination);
+        analyser.fftSize = 128;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        gainA.gain.value = 1;
+        gainB.gain.value = 0;
+        drawVisualizer();
+      }
+      if(audioContext.state === 'suspended') audioContext.resume();
     }
 
-    function setActiveButton(vibe) {
-      buttons.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.vibe === vibe);
-      });
+    function drawVisualizer() {
+      requestAnimationFrame(drawVisualizer);
+      if (!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const barWidth = (canvas.width / dataArray.length) * 2.5;
+      let x = 0;
+      const activeBtn = document.querySelector('.vibe-btn.active');
+      const rgbStr = activeBtn ? activeBtn.dataset.rgb : '85,85,85';
+      for (let i = 0; i < dataArray.length; i++) {
+        const barHeight = dataArray[i] * (canvas.height / 255) * 0.8;
+        ctx.fillStyle = `rgba(${rgbStr}, ${dataArray[i] / 255})`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 2;
+      }
     }
 
     async function requestTrack(vibe) {
-      const response = await fetch('/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vibe }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      const data = await response.json();
-      if (!response.ok || data.error || !data.url) {
-        throw new Error(data.error || 'stream generation failed');
-      }
-
-      return data;
-    }
-
-    async function prebufferNext(vibe) {
       try {
-        const data = await requestTrack(vibe);
-        prebuffer = {
-          vibe,
-          seed: data.seed || 'matrix seed',
-          url: `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`,
-        };
-      } catch (error) {
-        prebuffer = null;
-        console.error('prebuffer failed', error);
+          const response = await fetch('/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vibe }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'stream error');
+          return data;
+      } catch (e) {
+          clearTimeout(timeoutId);
+          throw e;
       }
     }
 
-    async function fetchAndPlay(vibe, usePrebuffer = true) {
-      if (!vibe || state.loading) return;
-
-      setLoading(true);
-      statusNode.textContent = `[${vibe}] acquiring next track...`;
-
+    // Refill the cache for a specific vibe
+    async function refillCache(vibe) {
       try {
-        let track;
-        if (usePrebuffer && prebuffer && prebuffer.vibe === vibe) {
-          track = prebuffer;
-          prebuffer = null;
-        } else {
+          console.log(`[Void] Refilling cache for: ${vibe}`);
           const data = await requestTrack(vibe);
-          track = {
-            vibe,
-            seed: data.seed || 'matrix seed',
-            url: `${data.url}${data.url.includes('?') ? '&' : '?'}t=${Date.now()}`,
-          };
+          state.vibeCache[vibe] = data;
+          
+          // Background load the audio data
+          const nextPlayer = state.currentPlayer === 'A' ? playerB : playerA;
+          if (state.activeVibe === vibe) {
+              nextPlayer.src = `${data.url}?t=${Date.now()}`;
+              nextPlayer.load();
+          }
+      } catch (e) { console.error(`Cache refill failed for ${vibe}`, e); }
+    }
+
+    // Initialize caches sequentially to avoid overloading
+    async function initAllCaches() {
+        statusText.textContent = "Priming Global Vibe Matrix...";
+        const vibes = Object.keys(state.vibeCache);
+        for (const vibe of vibes) {
+            await refillCache(vibe);
+            // Small gap between requests
+            await new Promise(r => setTimeout(r, 500));
         }
+        statusText.textContent = "Matrix Online. Select a State.";
+    }
 
-        state.activeVibe = vibe;
-        setActiveButton(vibe);
+    async function crossFade() {
+      if (state.isTransitioning) return;
+      
+      const nextData = state.vibeCache[state.activeVibe];
+      if (!nextData) {
+          refillCache(state.activeVibe);
+          return;
+      }
 
-        player.src = track.url;
-        player.load();
-        await player.play();
-        statusNode.textContent = `[${vibe}] live → ${track.seed}`;
+      state.isTransitioning = true;
+      const fadeTime = 3;
+      const now = audioContext.currentTime;
+      const outgoingPlayer = state.currentPlayer === 'A' ? playerA : playerB;
+      const incomingPlayer = state.currentPlayer === 'A' ? playerB : playerA;
+      const outgoingGain = state.currentPlayer === 'A' ? gainA : gainB;
+      const incomingGain = state.currentPlayer === 'A' ? gainB : gainA;
 
-        void prebufferNext(vibe);
-      } catch (error) {
-        statusNode.textContent = `stream error: ${error.message}`;
-      } finally {
-        setLoading(false);
+      const dynamicRate = 0.98 + (Math.random() * 0.04);
+      incomingPlayer.playbackRate = dynamicRate;
+      
+      updateUIForVibe(document.querySelector(`.vibe-btn[data-vibe="${state.activeVibe}"]`), nextData.metadata);
+      statusText.textContent = `State Linked: ${state.activeVibe.toUpperCase()} | RATE: ${dynamicRate.toFixed(2)}x`;
+
+      try {
+          await incomingPlayer.play();
+      } catch (e) {
+          console.warn("Autoplay block or playback error", e);
+          state.isTransitioning = false;
+          return;
+      }
+      
+      outgoingGain.gain.setValueAtTime(outgoingGain.gain.value, now);
+      outgoingGain.gain.linearRampToValueAtTime(0, now + fadeTime);
+      incomingGain.gain.setValueAtTime(incomingGain.gain.value, now);
+      incomingGain.gain.linearRampToValueAtTime(1, now + fadeTime);
+
+      setTimeout(() => {
+        outgoingPlayer.pause();
+        state.currentPlayer = state.currentPlayer === 'A' ? 'B' : 'A';
+        state.isTransitioning = false;
+        refillCache(state.activeVibe);
+      }, fadeTime * 1000);
+    }
+
+    function updateUIForVibe(btn, metadata) {
+      if (!btn) return;
+      root.style.setProperty('--vibe-color', btn.dataset.color);
+      root.style.setProperty('--vibe-rgb', btn.dataset.rgb);
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (metadata) {
+          trackTitle.textContent = metadata.title;
+          trackUploader.textContent = metadata.uploader || "UNKNOWN SOURCE";
       }
     }
 
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        fetchAndPlay(btn.dataset.vibe);
-      });
-    });
+    async function switchVibe(vibeBtn) {
+      const vibe = vibeBtn.dataset.vibe;
+      initAudioContext();
+      
+      const cachedTrack = state.vibeCache[vibe];
+      state.activeVibe = vibe;
 
-    player.addEventListener('ended', () => {
-      if (!state.activeVibe) return;
-      fetchAndPlay(state.activeVibe);
-    });
+      if (cachedTrack) {
+          const activePlayer = state.currentPlayer === 'A' ? playerA : playerB;
+          activePlayer.src = `${cachedTrack.url}?t=${Date.now()}`;
+          activePlayer.playbackRate = 0.98 + (Math.random() * 0.04);
+          
+          try {
+              await activePlayer.play();
+              updateUIForVibe(vibeBtn, cachedTrack.metadata);
+              statusText.textContent = `State Linked: ${vibe.toUpperCase()}`;
+              refillCache(vibe);
+          } catch (e) {
+              console.error("Playback failed", e);
+              statusText.textContent = "Click to Resume Audio";
+          }
+      } else {
+          setLoading(true);
+          try {
+              const trackData = await requestTrack(vibe);
+              const activePlayer = state.currentPlayer === 'A' ? playerA : playerB;
+              activePlayer.src = `${trackData.url}?t=${Date.now()}`;
+              await activePlayer.play();
+              updateUIForVibe(vibeBtn, trackData.metadata);
+              refillCache(vibe);
+          } catch (e) {
+              statusText.textContent = "Signal Lost. Retrying...";
+          } finally {
+              setLoading(false);
+          }
+      }
+    }
+
+    function monitorPlayers() {
+        const check = () => {
+            const activePlayer = state.currentPlayer === 'A' ? playerA : playerB;
+            if (activePlayer.duration && activePlayer.currentTime > activePlayer.duration - 5 && !state.isTransitioning) {
+                crossFade();
+            }
+            requestAnimationFrame(check);
+        };
+        check();
+    }
+    
+    monitorPlayers();
+    initAllCaches();
+
+    buttons.forEach(btn => btn.addEventListener('click', () => switchVibe(btn)));
+
+    function setLoading(isLoading) {
+      state.loading = isLoading;
+      buttons.forEach(btn => btn.disabled = isLoading);
+    }
   </script>
 </body>
 </html>
