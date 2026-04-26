@@ -1,20 +1,38 @@
 import http.server
 import json
 import os
-import random
 import socketserver
 import subprocess
+
+import redis
 
 PORT = 8090
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web_app")
 YTDLP_PATH = os.path.join(BASE_DIR, "tools", "yt-dlp")
-MATRIX_PATH = os.path.join(WEB_DIR, "matrix.json")
-DEFAULT_MATRIX = {
-    "God Complex": ["sigma phonk god complex edit", "alpha grindset domination phonk"],
-    "Spite": ["revenge workout phonk edit", "prove them wrong gym motivation"],
-    "Discipline": ["discipline over motivation gym edit", "cold routine no excuses phonk"],
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+VIBE_KEYS = {
+    "God Complex": "vibe:god_complex",
+    "Spite": "vibe:spite",
+    "Discipline": "vibe:discipline",
 }
+
+
+def normalize_vibe(vibe):
+    if not isinstance(vibe, str):
+        return "Discipline"
+
+    cleaned = vibe.strip().lower()
+    if cleaned in {"god complex", "god_complex", "god"}:
+        return "God Complex"
+    if cleaned in {"spite", "pure spite"}:
+        return "Spite"
+    return "Discipline"
+
+
+def redis_client():
+    return redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -27,18 +45,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode("utf-8"))
 
-    def _load_matrix(self):
-        if not os.path.isfile(MATRIX_PATH):
-            return DEFAULT_MATRIX
-
-        try:
-            with open(MATRIX_PATH, "r", encoding="utf-8") as fp:
-                data = json.load(fp)
-            if not isinstance(data, dict):
-                return DEFAULT_MATRIX
-            return data
-        except (OSError, json.JSONDecodeError):
-            return DEFAULT_MATRIX
+    def _random_seed_query(self, vibe):
+        normalized = normalize_vibe(vibe)
+        key = VIBE_KEYS[normalized]
+        client = redis_client()
+        query = client.srandmember(key)
+        if not query:
+            raise RuntimeError(f"No cached queries in Redis set: {key}. Run reddit_matrix.py first.")
+        return normalized, query
 
     def do_POST(self):
         try:
@@ -54,11 +68,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             payload = self.rfile.read(content_length)
             data = json.loads(payload.decode("utf-8"))
-            vibe = data.get("vibe", "Discipline")
+            requested_vibe = data.get("vibe", "Discipline")
 
-            matrix = self._load_matrix()
-            options = matrix.get(vibe) or DEFAULT_MATRIX.get(vibe) or DEFAULT_MATRIX["Discipline"]
-            seed_query = random.choice(options)
+            vibe, seed_query = self._random_seed_query(requested_vibe)
             print(f"[Master] Vibe={vibe} | Seed={seed_query}")
 
             cmd = [
@@ -74,6 +86,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             self._send_json(200, {"url": stream_url[0], "vibe": vibe, "seed": seed_query})
 
+        except redis.RedisError as exc:
+            print(f"[Redis] Failed to read vibe set: {exc}")
+            self._send_json(500, {"error": "Redis is unavailable."})
         except subprocess.CalledProcessError as exc:
             print(f"[Stream] Failed to resolve direct source: {exc}")
             self._send_json(500, {"error": "Failed to resolve direct source."})
@@ -82,7 +97,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(400, {"error": "Invalid JSON payload."})
         except Exception as exc:
             print(f"[Server] Unexpected error in do_POST: {exc}")
-            self._send_json(500, {"error": "Internal server error."})
+            self._send_json(500, {"error": str(exc) if str(exc) else "Internal server error."})
 
 
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
